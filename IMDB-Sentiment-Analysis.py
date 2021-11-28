@@ -6,6 +6,10 @@ from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn import metrics
+from sklearn.naive_bayes import MultinomialNB
 
 tsv_data = pd.read_csv('movie_reviews.tsv', sep='\t')
 tsv_data.columns = ['Ratings','Reviews']
@@ -65,3 +69,20 @@ print("Lemmatize")
 print(tsv_data.head())
 
 tsv_data.to_csv('PreprocessedData.tsv', encoding='utf-8', index=False)
+
+train, test = train_test_split(tsv_data, test_size=0.2, random_state=42, shuffle=True)
+tf_idf = TfidfVectorizer()
+
+Xtrain_tf = tf_idf.fit_transform(train['Reviews'])
+Xtrain_tf = tf_idf.transform(train['Reviews'])
+print("samples: %d, features: %d" % Xtrain_tf.shape)
+
+Xtest_tf = tf_idf.transform(test['Reviews'])
+print("samples: %d, features: %d" % Xtest_tf.shape)
+
+#MultinomialNB - https://scikit-learn.org/stable/modules/generated/sklearn.naive_bayes.MultinomialNB.html#sklearn.naive_bayes.MultinomialNB
+naiveBayesClassifier = MultinomialNB()
+naiveBayesClassifier.fit(Xtrain_tf, train['binaryRatings'])
+ratingPrediction = naiveBayesClassifier.predict(Xtest_tf)
+
+print(metrics.classification_report(test['binaryRatings'], ratingPrediction))
