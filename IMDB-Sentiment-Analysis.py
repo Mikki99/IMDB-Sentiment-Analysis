@@ -11,14 +11,17 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn import metrics
 from sklearn.naive_bayes import MultinomialNB
 
-tsv_data = pd.read_csv('movie_reviews.tsv', sep='\t')
+tsv_data = pd.read_csv('movie_reviews2.tsv', sep='\t')
 tsv_data.columns = ['Ratings','Reviews']
 tsv_data['binaryRatings'] = np.where(tsv_data['Ratings'] <=5, -1, 1)
 
 print("Binary Ratings")
 print(tsv_data.head())
 
-tsv_data.to_csv('labelledData.tsv', encoding='utf-8', index=False)
+tsv_data.to_csv('labelledData2.tsv', encoding='utf-8', index=False)
+
+tsv_data = tsv_data.drop(tsv_data.loc[tsv_data['binaryRatings'] == 1].sample(frac=0.5).index)
+
 tsv_data['Reviews'] = tsv_data['Reviews'].str.lower()
 
 print("Convert data to lowercase")
@@ -68,7 +71,7 @@ tsv_data["Reviews"] = tsv_data["Reviews"].apply(lambda text: lemmatizeWords(text
 print("Lemmatize")
 print(tsv_data.head())
 
-tsv_data.to_csv('PreprocessedData.tsv', encoding='utf-8', index=False)
+tsv_data.to_csv('PreprocessedData2.tsv', encoding='utf-8', index=False)
 
 train, test = train_test_split(tsv_data, test_size=0.2, random_state=42, shuffle=True)
 tf_idf = TfidfVectorizer()
@@ -83,6 +86,12 @@ print("samples: %d, features: %d" % Xtest_tf.shape)
 #MultinomialNB - https://scikit-learn.org/stable/modules/generated/sklearn.naive_bayes.MultinomialNB.html#sklearn.naive_bayes.MultinomialNB
 naiveBayesClassifier = MultinomialNB()
 naiveBayesClassifier.fit(Xtrain_tf, train['binaryRatings'])
-ratingPrediction = naiveBayesClassifier.predict(Xtest_tf)
 
-print(metrics.classification_report(test['binaryRatings'], ratingPrediction))
+trainRatingPrediction = naiveBayesClassifier.predict(Xtrain_tf)
+testRatingPrediction = naiveBayesClassifier.predict(Xtest_tf)
+
+print("Training Confusion Matrix")
+print(metrics.classification_report(train['binaryRatings'], trainRatingPrediction))
+
+print("Testing Confusion Matrix")
+print(metrics.classification_report(test['binaryRatings'], testRatingPrediction))
