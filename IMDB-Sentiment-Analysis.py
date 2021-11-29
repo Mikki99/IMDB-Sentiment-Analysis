@@ -111,3 +111,5 @@ print(metrics.classification_report(train['binaryRatings'], trainRatingPredictio
 
 print("Testing Confusion Matrix")
 print(metrics.classification_report(test['binaryRatings'], testRatingPrediction))
+
+#Logistic Regression
