@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn import metrics
 from sklearn.naive_bayes import MultinomialNB
+import matplotlib.pyplot as plt
 
 tsv_data = pd.read_csv('movie_reviews2.tsv', sep='\t')
 tsv_data.columns = ['Ratings','Reviews']
@@ -21,6 +22,21 @@ print(tsv_data.head())
 tsv_data.to_csv('labelledData2.tsv', encoding='utf-8', index=False)
 
 tsv_data = tsv_data.drop(tsv_data.loc[tsv_data['binaryRatings'] == 1].sample(frac=0.5).index)
+
+#Visualizing Data
+figure = plt.figure(figsize=(5,5))
+positiveRatings = tsv_data[tsv_data['binaryRatings'] == 1]
+negativeRatings = tsv_data[tsv_data['binaryRatings'] == -1]
+count = [positiveRatings['binaryRatings'].count(), negativeRatings['binaryRatings'].count()]
+colors = ["lightgreen",'red']
+pieChart = plt.pie(count,
+                 labels=["Positive Reviews", "Negative Reviews"],
+                 autopct ='%1.1f%%',
+                 colors = colors,
+                 shadow = True,
+                 startangle = 45,
+                 explode = (0, 0.1))
+plt.show()
 
 tsv_data['Reviews'] = tsv_data['Reviews'].str.lower()
 
