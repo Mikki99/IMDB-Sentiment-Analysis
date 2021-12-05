@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import string
 import nltk
 from nltk.corpus import stopwords
@@ -12,6 +13,8 @@ from sklearn import metrics
 from sklearn.naive_bayes import MultinomialNB
 import matplotlib.pyplot as plt
 from sklearn.svm import LinearSVC
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import mean_squared_error
 from xgboost import XGBClassifier
 import tensorflow as tf
 from tensorflow.keras.preprocessing.text import Tokenizer
@@ -19,6 +22,9 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.layers import Embedding, Bidirectional, LSTM, Dense, Dropout, Input
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
+from kerastuner.tuners import RandomSearch
+from kerastuner.engine.hyperparameters import HyperParameters
+from tensorflow.keras.models import Sequential
 
 tsv_data = pd.read_csv('movie_reviews3.tsv', sep='\t')
 tsv_data.columns = ['Ratings','Reviews']
@@ -27,7 +33,7 @@ tsv_data['binaryRatings'] = np.where(tsv_data['Ratings'] <= 5, -1, 1)
 print("Binary Ratings")
 print(tsv_data.head())
 
-tsv_data.to_csv('labelledData3.tsv', encoding='utf-8', index=False)
+# tsv_data.to_csv('labelledData3.tsv', encoding='utf-8', index=False)
 
 tsv_data = tsv_data.drop(tsv_data.loc[tsv_data['binaryRatings'] == 1].sample(frac=0.56).index)
 
@@ -95,7 +101,7 @@ tsv_data["Reviews"] = tsv_data["Reviews"].apply(lambda text: lemmatizeWords(text
 print("Lemmatize")
 print(tsv_data.head())
 
-tsv_data.to_csv('PreprocessedData3.tsv', encoding='utf-8', index=False)
+# tsv_data.to_csv('PreprocessedData3.tsv', encoding='utf-8', index=False)
 
 train, test = train_test_split(tsv_data, test_size=0.2, random_state=42, shuffle=True)
 tf_idf = TfidfVectorizer()
@@ -107,7 +113,7 @@ print("samples: %d, features: %d" % Xtrain_tf.shape)
 Xtest_tf = tf_idf.transform(test['Reviews'])
 print("samples: %d, features: %d" % Xtest_tf.shape)
 
-#MultinomialNB - https://scikit-learn.org/stable/modules/generated/sklearn.naive_bayes.MultinomialNB.html#sklearn.naive_bayes.MultinomialNB
+# #MultinomialNB - https://scikit-learn.org/stable/modules/generated/sklearn.naive_bayes.MultinomialNB.html#sklearn.naive_bayes.MultinomialNB
 naiveBayesClassifier = MultinomialNB()
 naiveBayesClassifier.fit(Xtrain_tf, train['binaryRatings'])
 
@@ -128,15 +134,27 @@ lin_svc = LinearSVC()
 lin_svc.fit(Xtrain_tf, train['binaryRatings'])
 pred_svc = lin_svc.predict(Xtest_tf)
 
+mean_error = []
+std_error = []
+C = [0.0001, 0.01, 0.1, 1, 10, 50]
+for c in C:
+    model = LinearSVC(C=c)
+    scores = cross_val_score(model, Xtrain_tf.toarray(), train['binaryRatings'], cv=5, scoring='f1')
+    mean_error.append(np.array(scores).mean())
+    std_error.append(np.array(scores).std())
+
+plt.figure()
+plt.errorbar(C, mean_error, yerr=std_error)
+plt.xlabel('C')
+plt.ylabel('F1-Score')
+plt.xlim((-1, 50))
+plt.show()
+
+lin_svc = LinearSVC(C=0.1)
+lin_svc.fit(Xtrain_tf, train['binaryRatings'])
+pred_svc = lin_svc.predict(Xtest_tf)
+
 print(metrics.classification_report(test['binaryRatings'], pred_svc))
-
-# Just playing around with another model
-# XG-Boost
-clf3 = XGBClassifier()
-clf3.fit(Xtrain_tf, train['binaryRatings'])
-preds3 = clf3.predict(Xtest_tf)
-
-print(metrics.classification_report(test['binaryRatings'], preds3))
 
 ####################################################################
 ####################################################################
@@ -147,12 +165,11 @@ print(metrics.classification_report(test['binaryRatings'], preds3))
 train_nn = train.replace({'binaryRatings': {-1: 0}})
 test_nn = test.replace({'binaryRatings': {-1: 0}})
 
-
 # Split train and test data into reviews and labels
-X_train = train['Reviews'].values
-y_train = train['binaryRatings'].values
-X_test = test['Reviews'].values
-y_test = test['binaryRatings'].values
+X_train = train_nn['Reviews'].values
+y_train = train_nn['binaryRatings'].values
+X_test = test_nn['Reviews'].values
+y_test = test_nn['binaryRatings'].values
 
 # Fit Keras tokenizer on train reviews
 vocab_size = 10000
@@ -176,13 +193,56 @@ max_len = 385
 # Use padding so that all sequences are of same length
 X_train_seq_padded = pad_sequences(X_train_seq, maxlen=max_len)
 X_test_seq_padded = pad_sequences(X_test_seq, maxlen=max_len)
+print(X_train_seq_padded.shape)
+print(X_test_seq_padded.shape)
 
+
+def build_model(hp):
+    model = Sequential()
+
+    model.add(Embedding(hp.Int('input_dim', min_value=5000, max_value=15000, step=1000),
+                        hp.Int('emb_dim', min_value=32, max_value=256, step=32),
+                        input_shape=(max_len, )))
+    # for i in range(hp.Int('n_layers', 0, 3)):
+    #     model.add(Bidirectional(LSTM(hp.Int(f'BiLSTM_{i}_neurons', min_value=2, max_value=64, step=4),
+    #                                  return_sequences=True)))
+    model.add(Bidirectional(LSTM(units=hp.Int('BiLSTM_neurons', min_value=2, max_value=64, step=4))))
+    model.add(Dense(hp.Int('dense_neurons', min_value=32, max_value=256, step=32), activation='relu'))
+    model.add(Dropout(hp.Float('dropout_rate', min_value=0, max_value=0.5, step=0.1)))
+    model.add(Dense(1, activation='sigmoid'))
+
+    #optimizer = Adam(learning_rate=0.0009)
+
+    model.compile(optimizer='adam',
+                  loss='binary_crossentropy',
+                  metrics=['accuracy'])
+    return model
+
+tuner1 = RandomSearch(
+    build_model,
+    objective='val_accuracy',
+    max_trials=3,
+    executions_per_trial=1
+)
+
+tuner1.search(x=X_train_seq_padded,
+             y=y_train,
+             epochs=5,
+             batch_size=64,
+             validation_data=(X_test_seq_padded, y_test))
+
+best_model = tuner1.get_best_models(num_models=1)[0]
+best_hp = tuner1.get_best_hyperparameters()[0].values
+
+print(tuner1.results_summary())
+print(best_hp)
+best_model.summary()
 
 # Defining the model
 inputs = Input(shape=(max_len,))
-x = Embedding(vocab_size, 338)(inputs)
-x = LSTM(units=8)(x)
-x = Dense(111, activation="relu")(x)
+x = Embedding(10000, 96)(inputs)
+x = Bidirectional(LSTM(units=54))(x)
+x = Dense(160, activation="relu")(x)
 x = Dropout(0.5)(x)
 outputs = Dense(1, activation="sigmoid")(x)
 model = tf.keras.Model(inputs=inputs, outputs=outputs)
@@ -195,11 +255,12 @@ model.compile(optimizer=optimizer,
 model.summary()
 history = model.fit(x=X_train_seq_padded,
                     y=y_train,
-                    batch_size=56,
+                    batch_size=64,
                     epochs=35,
                     validation_data=(X_test_seq_padded, y_test),
                     callbacks=[EarlyStopping(monitor='val_accuracy', patience=3)])
 
+model.save("LSTM_model_tuned")
 # Predictions
 preds_test = model.predict(X_test_seq_padded)
 preds_test = np.array([1 if pred > 0.5 else 0 for pred in preds_test.flatten()])
