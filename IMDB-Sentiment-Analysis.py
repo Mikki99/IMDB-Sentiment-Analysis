@@ -29,7 +29,7 @@ from wordcloud import WordCloud
 from sklearn.metrics import roc_curve
 
 tsv_data = pd.read_csv('movie_reviews3.tsv', sep='\t')
-tsv_data.columns = ['Ratings','Reviews']
+tsv_data.columns = ['Ratings', 'Reviews']
 tsv_data['binaryRatings'] = np.where(tsv_data['Ratings'] <= 5, -1, 1)
 
 print("Binary Ratings")
@@ -104,6 +104,58 @@ tsv_data['Reviews'] = tsv_data['Reviews'].apply(lambda text: removeStopWords(tex
 print("Remove stop words")
 print(tsv_data.head())
 
+#########################################
+# WORD CLOUD
+from collections import Counter
+import nltk
+
+# Tokenizing reviews
+positiveRatings["tokenized"] = positiveRatings["Reviews"].apply(nltk.word_tokenize)
+negativeRatings["tokenized"] = negativeRatings["Reviews"].apply(nltk.word_tokenize)
+
+# Creating single list with all positive words
+pos_words = []
+for pos_list in positiveRatings["tokenized"]:
+    pos_words += pos_list
+
+# Creating single list with all negative words
+neg_words = []
+for neg_list in negativeRatings["tokenized"]:
+    neg_words += neg_list
+
+# Get 100 most freq. POS words
+# and store just words in a list (without count)
+pos_top100 = Counter(pos_words).most_common(100)
+pos_top100 = [item[0] for item in pos_top100]
+
+# Get 100 most freq. NEG words
+# and store just words in a list (without count)
+neg_top100 = Counter(neg_words).most_common(100)
+neg_top100 = [item[0] for item in neg_top100]
+
+# WordCloud POS
+wordcloud = WordCloud(stopwords=stopwords.words('english'),
+                  background_color='white',
+                  width=2500,
+                  height=2000
+                 ).generate(" ".join(pos_top100))
+plt.figure(1,figsize=(10, 7))
+plt.imshow(wordcloud)
+plt.axis('off')
+plt.show()
+
+# WordClout NEG
+wordcloud = WordCloud(stopwords=stopwords.words('english'),
+                  background_color='white',
+                  width=2500,
+                  height=2000
+                 ).generate(" ".join(neg_top100))
+plt.figure(1,figsize=(10, 7))
+plt.imshow(wordcloud)
+plt.axis('off')
+plt.show()
+
+#########################################
 stemmer = PorterStemmer()
 def stemWords(text):
     return " ".join([stemmer.stem(word) for word in text.split()])
@@ -193,10 +245,11 @@ for c in C:
     std_error.append(np.array(scores).std())
 
 plt.figure()
+plt.title("Linear SVC")
 plt.errorbar(C, mean_error, yerr=std_error)
 plt.xlabel('C')
 plt.ylabel('F1-Score')
-plt.xlim((-1, 50))
+plt.xlim((-1, 20))
 plt.show()
 
 lin_svc = LinearSVC(C=0.1)
