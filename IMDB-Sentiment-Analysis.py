@@ -25,6 +25,7 @@ from tensorflow.keras.optimizers import Adam
 from kerastuner.tuners import RandomSearch
 from kerastuner.engine.hyperparameters import HyperParameters
 from tensorflow.keras.models import Sequential
+from wordcloud import WordCloud
 
 tsv_data = pd.read_csv('movie_reviews3.tsv', sep='\t')
 tsv_data.columns = ['Ratings','Reviews']
@@ -50,6 +51,28 @@ pieChart = plt.pie(count,
                  shadow = True,
                  startangle = 45,
                  explode = (0, 0.1))
+plt.show()
+
+#Data cloud for binary Rating +1 for a review
+wordcloud = WordCloud(stopwords=stopwords.words('english'),
+                  background_color='white',
+                  width=2500,
+                  height=2000
+                 ).generate(positiveRatings['Reviews'].iloc[1])
+plt.figure(1,figsize=(10, 7))
+plt.imshow(wordcloud)
+plt.axis('off')
+plt.show()
+
+#Data cloud for binary Rating -1 for a review
+wordcloud = WordCloud(stopwords=stopwords.words('english'),
+                  background_color='white',
+                  width=2500,
+                  height=2000
+                 ).generate(negativeRatings['Reviews'].iloc[1])
+plt.figure(1,figsize=(10, 7))
+plt.imshow(wordcloud)
+plt.axis('off')
 plt.show()
 
 tsv_data['Reviews'] = tsv_data['Reviews'].str.lower()
