@@ -26,6 +26,7 @@ from kerastuner.tuners import RandomSearch
 from kerastuner.engine.hyperparameters import HyperParameters
 from tensorflow.keras.models import Sequential
 from wordcloud import WordCloud
+from sklearn.metrics import roc_curve
 
 tsv_data = pd.read_csv('movie_reviews3.tsv', sep='\t')
 tsv_data.columns = ['Ratings','Reviews']
@@ -124,14 +125,39 @@ tsv_data["Reviews"] = tsv_data["Reviews"].apply(lambda text: lemmatizeWords(text
 print("Lemmatize")
 print(tsv_data.head())
 
-# tsv_data.to_csv('PreprocessedData3.tsv', encoding='utf-8', index=False)
+print("\nShowcasing Preprocessing of data for one sample review\n")
+
+sampleReview = "This is a beautifully sculpted slow paced romantic adorable and lovable movie. Halitha shameem deserves all the appreciation. Wish to see more movies coming like this in the future"
+
+print("Sample Review from the dataset")
+print("---->",sampleReview)
+
+sampleReviewLowercase = sampleReview.lower()
+print("Lowercase conversion")
+print("---->",sampleReviewLowercase)
+
+sampleReviewPR = punctuationRemoval(sampleReviewLowercase)
+print("Punctuation Removal")
+print("---->",sampleReviewPR)
+
+sampleReviewRSW = removeStopWords(sampleReviewPR)
+print("Stop Words Removal")
+print("---->",sampleReviewRSW)
+
+sampleReviewStemming = stemWords(sampleReviewRSW)
+print("Stemming")
+print("---->",sampleReviewStemming)
+
+sampleReviewLemmatizing = lemmatizeWords(sampleReviewStemming)
+print("Lemmatizing")
+print("---->",sampleReviewLemmatizing)
 
 train, test = train_test_split(tsv_data, test_size=0.2, random_state=42, shuffle=True)
 tf_idf = TfidfVectorizer()
 
 Xtrain_tf = tf_idf.fit_transform(train['Reviews'])
 Xtrain_tf = tf_idf.transform(train['Reviews'])
-print("samples: %d, features: %d" % Xtrain_tf.shape)
+print("\nsamples: %d, features: %d" % Xtrain_tf.shape)
 
 Xtest_tf = tf_idf.transform(test['Reviews'])
 print("samples: %d, features: %d" % Xtest_tf.shape)
@@ -178,6 +204,21 @@ lin_svc.fit(Xtrain_tf, train['binaryRatings'])
 pred_svc = lin_svc.predict(Xtest_tf)
 
 print(metrics.classification_report(test['binaryRatings'], pred_svc))
+
+#ROC
+YscoreMNB = naiveBayesClassifier.predict_proba(Xtest_tf)
+fprMNB, tprMNB, _ = roc_curve(test['binaryRatings'], YscoreMNB[:, 1])
+
+YscoreLSVC = lin_svc._predict_proba_lr(Xtest_tf)
+fprLSVC, tprLSVC, _ = roc_curve(test['binaryRatings'], YscoreLSVC[:, 1])
+
+plt.plot(fprMNB, tprMNB)
+plt.plot(fprLSVC, tprLSVC)
+plt.xlabel('false positive rate') 
+plt.ylabel('true positive rate') 
+plt.title('ROC Plot') 
+plt.legend(['ROC for Naive Bayes', 'ROC for Linear SVC'])
+plt.show()
 
 ####################################################################
 ####################################################################
