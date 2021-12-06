@@ -27,6 +27,7 @@ from kerastuner.engine.hyperparameters import HyperParameters
 from tensorflow.keras.models import Sequential
 from wordcloud import WordCloud
 from sklearn.metrics import roc_curve
+from sklearn.dummy import DummyClassifier
 
 tsv_data = pd.read_csv('movie_reviews3.tsv', sep='\t')
 tsv_data.columns = ['Ratings', 'Reviews']
@@ -315,7 +316,7 @@ print(X_test_seq_padded.shape)
 def build_model(hp):
     model = Sequential()
 
-    model.add(Embedding(hp.Int('input_dim', min_value=5000, max_value=15000, step=1000),
+    model.add(Embedding(vocab_size,
                         hp.Int('emb_dim', min_value=32, max_value=256, step=32),
                         input_shape=(max_len, )))
     # for i in range(hp.Int('n_layers', 0, 3)):
@@ -355,9 +356,9 @@ best_model.summary()
 
 # Defining the model
 inputs = Input(shape=(max_len,))
-x = Embedding(10000, 96)(inputs)
-x = Bidirectional(LSTM(units=54))(x)
-x = Dense(160, activation="relu")(x)
+x = Embedding(10000, 64)(inputs)
+x = Bidirectional(LSTM(units=22))(x)
+x = Dense(96, activation="relu")(x)
 x = Dropout(0.5)(x)
 outputs = Dense(1, activation="sigmoid")(x)
 model = tf.keras.Model(inputs=inputs, outputs=outputs)
@@ -376,6 +377,7 @@ history = model.fit(x=X_train_seq_padded,
                     callbacks=[EarlyStopping(monitor='val_accuracy', patience=3)])
 
 model.save("LSTM_model_tuned")
+model = tf.keras.models.load_model("LSTM_model_tuned")
 # Predictions
 preds_test = model.predict(X_test_seq_padded)
 preds_test = np.array([1 if pred > 0.5 else 0 for pred in preds_test.flatten()])
@@ -385,3 +387,26 @@ preds_train = np.array([1 if pred > 0.5 else 0 for pred in preds_train.flatten()
 
 print(metrics.classification_report(y_test, preds_test))
 print(metrics.classification_report(y_train, preds_train))
+
+# Random baseline classifier
+dummy = DummyClassifier(strategy='most_frequent').fit(Xtrain_tf, train["binaryRatings"])
+fprDUMMY, tprDUMMY, _ = roc_curve(test["binaryRatings"],
+                            dummy.predict_proba(Xtest_tf)[:, 1])
+# ROC curves
+fprLSTM, tprLSTM, _ = roc_curve(test['binaryRatings'], model.predict(X_test_seq_padded).ravel())
+
+plt.plot(fprMNB, tprMNB)
+plt.plot(fprLSVC, tprLSVC)
+plt.plot(fprLSTM, tprLSTM)
+plt.plot(fprDUMMY, tprDUMMY, linestyle='--')
+plt.xlabel('false positive rate')
+plt.ylabel('true positive rate')
+plt.title('ROC Plot')
+plt.legend(['Naive Bayes', 'Linear SVC', 'LSTM', 'Baseline CLF'])
+plt.show()
+
+
+
+
+
+# Random baseline
