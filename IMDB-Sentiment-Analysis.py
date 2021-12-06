@@ -36,9 +36,24 @@ tsv_data['binaryRatings'] = np.where(tsv_data['Ratings'] <= 5, -1, 1)
 print("Binary Ratings")
 print(tsv_data.head())
 
+#Visualizing Data
+figure = plt.figure(figsize=(5,5))
+positiveRatings = tsv_data[tsv_data['binaryRatings'] == 1]
+negativeRatings = tsv_data[tsv_data['binaryRatings'] == -1]
+count = [positiveRatings['binaryRatings'].count(), negativeRatings['binaryRatings'].count()]
+colors = ["lightgreen",'red']
+pieChart = plt.pie(count,
+                 labels=["Positive Reviews", "Negative Reviews"],
+                 autopct ='%1.1f%%',
+                 colors = colors,
+                 shadow = True,
+                 startangle = 45,
+                 explode = (0, 0.1))
+plt.show()
+
 tsv_data = tsv_data.drop(tsv_data.loc[tsv_data['binaryRatings'] == 1].sample(frac=0.56).index)
 
-#Visualizing Data
+#Visualizing Data after downsampling
 figure = plt.figure(figsize=(5,5))
 positiveRatings = tsv_data[tsv_data['binaryRatings'] == 1]
 negativeRatings = tsv_data[tsv_data['binaryRatings'] == -1]
@@ -56,6 +71,7 @@ plt.show()
 #Data cloud for binary Rating +1 for a review
 wordcloud = WordCloud(stopwords=stopwords.words('english'),
                   background_color='white',
+                  colormap = 'Greens',
                   width=2500,
                   height=2000
                  ).generate(positiveRatings['Reviews'].iloc[1])
@@ -67,6 +83,7 @@ plt.show()
 #Data cloud for binary Rating -1 for a review
 wordcloud = WordCloud(stopwords=stopwords.words('english'),
                   background_color='white',
+                  colormap = 'Reds',
                   width=2500,
                   height=2000
                  ).generate(negativeRatings['Reviews'].iloc[1])
@@ -263,14 +280,6 @@ fprMNB, tprMNB, _ = roc_curve(test['binaryRatings'], YscoreMNB[:, 1])
 
 YscoreLSVC = lin_svc._predict_proba_lr(Xtest_tf)
 fprLSVC, tprLSVC, _ = roc_curve(test['binaryRatings'], YscoreLSVC[:, 1])
-
-plt.plot(fprMNB, tprMNB)
-plt.plot(fprLSVC, tprLSVC)
-plt.xlabel('false positive rate') 
-plt.ylabel('true positive rate') 
-plt.title('ROC Plot') 
-plt.legend(['ROC for Naive Bayes', 'ROC for Linear SVC'])
-plt.show()
 
 ####################################################################
 ####################################################################
