@@ -30,6 +30,9 @@ from sklearn.metrics import roc_curve
 from sklearn.dummy import DummyClassifier
 from sklearn.metrics import confusion_matrix
 import itertools
+from textblob import TextBlob
+from sklearn.linear_model import LogisticRegression
+
 
 tsv_data = pd.read_csv('movie_reviews3.tsv', sep='\t')
 tsv_data.columns = ['Ratings', 'Reviews']
@@ -50,7 +53,8 @@ pieChart = plt.pie(count,
                  colors = colors,
                  shadow = True,
                  startangle = 45,
-                 explode = (0, 0.1))
+                 explode = (0, 0.1),
+                 textprops = {"fontsize":32})
 plt.show()
 
 tsv_data = tsv_data.drop(tsv_data.loc[tsv_data['binaryRatings'] == 1].sample(frac=0.56).index)
@@ -67,7 +71,8 @@ pieChart = plt.pie(count,
                  colors = colors,
                  shadow = True,
                  startangle = 45,
-                 explode = (0, 0.1))
+                 explode = (0, 0.1),
+                 textprops = {"fontsize":32})
 plt.show()
 
 #Data cloud for binary Rating +1 for a review
@@ -246,7 +251,14 @@ print("Testing Confusion Matrix")
 print(metrics.classification_report(test['binaryRatings'], testRatingPrediction))
 
 # TODO: Logistic Regression
+logisticRegression_variable = LogisticRegression()
+cross_score = cross_val_score(logisticRegression_variable, Xtrain_tf, train['binaryRatings'])
+logisticRegression_variable.fit(Xtrain_tf, train['binaryRatings'])
+test_prediction = logisticRegression_variable.predict(Xtest_tf)
+print(metrics.classification_report(test['binaryRatings'], test_prediction))
 
+YscoreLR = logisticRegression_variable.predict_proba(Xtest_tf)
+fprLR, tprLR, _ = roc_curve(test['binaryRatings'], YscoreMNB[:, 1])
 
 # Linear SVC
 lin_svc = LinearSVC()
@@ -404,6 +416,19 @@ preds_train = np.array([1 if pred > 0.5 else 0 for pred in preds_train.flatten()
 print(metrics.classification_report(y_test, preds_test))
 print(metrics.classification_report(y_train, preds_train))
 
+result_list = []
+outcome_labels = []
+for index, row in tsv_data.iterrows():
+    result_textBlob = TextBlob(row["Reviews"]).sentiment
+    polarity_value = result_textBlob.polarity
+    if polarity_value > 0:
+        outcome_labels.append(-1)
+    else:
+        outcome_labels.append(1)
+print(test['binaryRatings'])
+# print("Inbult Function",f1_score(test['binaryRatings'], outcome_labels))
+# print("Our Model",f1_score(tsv_data['binaryRatings'],test['binaryRatings']))
+
 # Random baseline classifier
 dummy = DummyClassifier(strategy='most_frequent').fit(Xtrain_tf, train["binaryRatings"])
 dummy_preds = dummy.predict(Xtest_tf)
@@ -416,10 +441,11 @@ plt.plot(fprMNB, tprMNB)
 plt.plot(fprLSVC, tprLSVC)
 plt.plot(fprLSTM, tprLSTM)
 plt.plot(fprDUMMY, tprDUMMY, linestyle='--')
+plt.plot(fprLR, tprLR)
 plt.xlabel('false positive rate')
 plt.ylabel('true positive rate')
 plt.title('ROC Plot')
-plt.legend(['Naive Bayes', 'Linear SVC', 'LSTM', 'Baseline CLF'])
+plt.legend(['Naive Bayes', 'Linear SVC', 'LSTM', 'Baseline CLF', 'Logistic Regression'])
 plt.show()
 
 # Confusion matrices
@@ -427,6 +453,7 @@ conf_mtx_lstm = confusion_matrix(test_nn["binaryRatings"], preds_test)
 conf_mtx_linSVC = confusion_matrix(test["binaryRatings"], pred_svc)
 conf_mtx_NB = confusion_matrix(test["binaryRatings"], testRatingPrediction)
 conf_mtx_dummy = confusion_matrix(test["binaryRatings"], dummy_preds)
+conf_mtx_lr = confusion_matrix(test["binaryRatings"], test_prediction)
 
 
 def plot_conf_matrix(cm, classes,
@@ -468,6 +495,7 @@ plot_conf_matrix(cm=conf_mtx_lstm, classes=labels, title="LSTM")
 plot_conf_matrix(cm=conf_mtx_linSVC, classes=labels, title="Linear SVC")
 plot_conf_matrix(cm=conf_mtx_NB, classes=labels, title="Naive Bayes")
 plot_conf_matrix(cm=conf_mtx_dummy, classes=labels, title="Baseline CLF")
+plot_conf_matrix(cm=conf_mtx_lr, classes=labels, title="Logistic Regression")
 
 plt.show()
 
