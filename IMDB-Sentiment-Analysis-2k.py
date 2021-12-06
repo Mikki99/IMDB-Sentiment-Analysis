@@ -27,6 +27,7 @@ from kerastuner.engine.hyperparameters import HyperParameters
 from tensorflow.keras.models import Sequential
 from wordcloud import WordCloud
 from sklearn.metrics import roc_curve
+from sklearn.dummy import DummyClassifier
 
 tsv_data = pd.read_csv('movie_reviews.tsv', sep='\t')
 tsv_data.columns = ['Ratings', 'Reviews']
@@ -35,9 +36,24 @@ tsv_data['binaryRatings'] = np.where(tsv_data['Ratings'] <= 5, -1, 1)
 print("Binary Ratings")
 print(tsv_data.head())
 
+#Visualizing Data
+figure = plt.figure(figsize=(5,5))
+positiveRatings = tsv_data[tsv_data['binaryRatings'] == 1]
+negativeRatings = tsv_data[tsv_data['binaryRatings'] == -1]
+count = [positiveRatings['binaryRatings'].count(), negativeRatings['binaryRatings'].count()]
+colors = ["lightgreen",'red']
+pieChart = plt.pie(count,
+                 labels=["Positive Reviews", "Negative Reviews"],
+                 autopct ='%1.1f%%',
+                 colors = colors,
+                 shadow = True,
+                 startangle = 45,
+                 explode = (0, 0.1))
+plt.show()
+
 tsv_data = tsv_data.drop(tsv_data.loc[tsv_data['binaryRatings'] == 1].sample(frac=0.56).index)
 
-#Visualizing Data
+#Visualizing Data after downsampling
 figure = plt.figure(figsize=(5,5))
 positiveRatings = tsv_data[tsv_data['binaryRatings'] == 1]
 negativeRatings = tsv_data[tsv_data['binaryRatings'] == -1]
@@ -55,6 +71,7 @@ plt.show()
 #Data cloud for binary Rating +1 for a review
 wordcloud = WordCloud(stopwords=stopwords.words('english'),
                   background_color='white',
+                  colormap = 'Greens',
                   width=2500,
                   height=2000
                  ).generate(positiveRatings['Reviews'].iloc[1])
@@ -66,9 +83,10 @@ plt.show()
 #Data cloud for binary Rating -1 for a review
 wordcloud = WordCloud(stopwords=stopwords.words('english'),
                   background_color='white',
+                  colormap = 'Reds',
                   width=2500,
                   height=2000
-                 ).generate(negativeRatings['Reviews'].iloc[1])
+                 ).generate(negativeRatings['Reviews'].iloc[2])
 plt.figure(1,figsize=(10, 7))
 plt.imshow(wordcloud)
 plt.axis('off')
@@ -263,14 +281,6 @@ fprMNB, tprMNB, _ = roc_curve(test['binaryRatings'], YscoreMNB[:, 1])
 YscoreLSVC = lin_svc._predict_proba_lr(Xtest_tf)
 fprLSVC, tprLSVC, _ = roc_curve(test['binaryRatings'], YscoreLSVC[:, 1])
 
-plt.plot(fprMNB, tprMNB)
-plt.plot(fprLSVC, tprLSVC)
-plt.xlabel('false positive rate') 
-plt.ylabel('true positive rate') 
-plt.title('ROC Plot') 
-plt.legend(['ROC for Naive Bayes', 'ROC for Linear SVC'])
-plt.show()
-
 ####################################################################
 ####################################################################
 ####################################################################
@@ -312,52 +322,53 @@ print(X_train_seq_padded.shape)
 print(X_test_seq_padded.shape)
 
 
-def build_model(hp):
-    model = Sequential()
+def lstm_hp_tune(verbose=False):
+    def build_model(hp):
+        model = Sequential()
 
-    model.add(Embedding(hp.Int('input_dim', min_value=5000, max_value=15000, step=1000),
-                        hp.Int('emb_dim', min_value=32, max_value=256, step=32),
-                        input_shape=(max_len, )))
-    # for i in range(hp.Int('n_layers', 0, 3)):
-    #     model.add(Bidirectional(LSTM(hp.Int(f'BiLSTM_{i}_neurons', min_value=2, max_value=64, step=4),
-    #                                  return_sequences=True)))
-    model.add(Bidirectional(LSTM(units=hp.Int('BiLSTM_neurons', min_value=2, max_value=64, step=4))))
-    model.add(Dense(hp.Int('dense_neurons', min_value=32, max_value=256, step=32), activation='relu'))
-    model.add(Dropout(hp.Float('dropout_rate', min_value=0, max_value=0.5, step=0.1)))
-    model.add(Dense(1, activation='sigmoid'))
+        model.add(Embedding(vocab_size,
+                            hp.Int('emb_dim', min_value=32, max_value=256, step=32),
+                            input_shape=(max_len, )))
+        for i in range(hp.Int('n_layers', 0, 3)):
+            model.add(Bidirectional(LSTM(hp.Int(f'BiLSTM_{i}_neurons', min_value=2, max_value=64, step=4),
+                                         return_sequences=True)))
+        model.add(Bidirectional(LSTM(units=hp.Int('BiLSTM_neurons', min_value=2, max_value=64, step=4))))
+        model.add(Dense(hp.Int('dense_neurons', min_value=32, max_value=256, step=32), activation='relu'))
+        model.add(Dropout(hp.Float('dropout_rate', min_value=0, max_value=0.5, step=0.1)))
+        model.add(Dense(1, activation='sigmoid'))
 
-    #optimizer = Adam(learning_rate=0.0009)
+        model.compile(optimizer='adam',
+                      loss='binary_crossentropy',
+                      metrics=['accuracy'])
+        return model
 
-    model.compile(optimizer='adam',
-                  loss='binary_crossentropy',
-                  metrics=['accuracy'])
-    return model
+    tuner = RandomSearch(
+        build_model,
+        objective='val_accuracy',
+        max_trials=3,
+        executions_per_trial=1
+    )
 
-tuner1 = RandomSearch(
-    build_model,
-    objective='val_accuracy',
-    max_trials=3,
-    executions_per_trial=1
-)
+    tuner.search(x=X_train_seq_padded,
+                 y=y_train,
+                 epochs=5,
+                 batch_size=64,
+                 validation_data=(X_test_seq_padded, y_test))
 
-tuner1.search(x=X_train_seq_padded,
-             y=y_train,
-             epochs=5,
-             batch_size=64,
-             validation_data=(X_test_seq_padded, y_test))
+    best_model = tuner.get_best_models(num_models=1)[0]
+    best_hp = tuner.get_best_hyperparameters()[0].values
 
-best_model = tuner1.get_best_models(num_models=1)[0]
-best_hp = tuner1.get_best_hyperparameters()[0].values
+    if verbose:
+        print(best_model.summary())
+        print(tuner.results_summary())
 
-print(tuner1.results_summary())
-print(best_hp)
-best_model.summary()
+    return best_hp
 
 # Defining the model
 inputs = Input(shape=(max_len,))
-x = Embedding(10000, 96)(inputs)
-x = Bidirectional(LSTM(units=54))(x)
-x = Dense(160, activation="relu")(x)
+x = Embedding(10000, 64)(inputs)
+x = Bidirectional(LSTM(units=22))(x)
+x = Dense(96, activation="relu")(x)
 x = Dropout(0.5)(x)
 outputs = Dense(1, activation="sigmoid")(x)
 model = tf.keras.Model(inputs=inputs, outputs=outputs)
@@ -376,6 +387,7 @@ history = model.fit(x=X_train_seq_padded,
                     callbacks=[EarlyStopping(monitor='val_accuracy', patience=3)])
 
 model.save("LSTM_model_tuned")
+model = tf.keras.models.load_model("LSTM_model_tuned")
 # Predictions
 preds_test = model.predict(X_test_seq_padded)
 preds_test = np.array([1 if pred > 0.5 else 0 for pred in preds_test.flatten()])
@@ -385,3 +397,20 @@ preds_train = np.array([1 if pred > 0.5 else 0 for pred in preds_train.flatten()
 
 print(metrics.classification_report(y_test, preds_test))
 print(metrics.classification_report(y_train, preds_train))
+
+# Random baseline classifier
+dummy = DummyClassifier(strategy='most_frequent').fit(Xtrain_tf, train["binaryRatings"])
+fprDUMMY, tprDUMMY, _ = roc_curve(test["binaryRatings"],
+                            dummy.predict_proba(Xtest_tf)[:, 1])
+# ROC curves
+fprLSTM, tprLSTM, _ = roc_curve(test['binaryRatings'], model.predict(X_test_seq_padded).ravel())
+
+plt.plot(fprMNB, tprMNB)
+plt.plot(fprLSVC, tprLSVC)
+plt.plot(fprLSTM, tprLSTM)
+plt.plot(fprDUMMY, tprDUMMY, linestyle='--')
+plt.xlabel('false positive rate')
+plt.ylabel('true positive rate')
+plt.title('ROC Plot')
+plt.legend(['Naive Bayes', 'Linear SVC', 'LSTM', 'Baseline CLF'])
+plt.show()
