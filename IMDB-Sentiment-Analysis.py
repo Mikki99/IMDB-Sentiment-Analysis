@@ -28,6 +28,8 @@ from tensorflow.keras.models import Sequential
 from wordcloud import WordCloud
 from sklearn.metrics import roc_curve
 from sklearn.dummy import DummyClassifier
+from sklearn.metrics import confusion_matrix
+import itertools
 
 tsv_data = pd.read_csv('movie_reviews3.tsv', sep='\t')
 tsv_data.columns = ['Ratings', 'Reviews']
@@ -364,6 +366,10 @@ def lstm_hp_tune(verbose=False):
 
     return best_hp
 
+
+# best_hp = lstm_hp_tune()
+# print(best_hp)
+
 # Defining the model
 inputs = Input(shape=(max_len,))
 x = Embedding(10000, 64)(inputs)
@@ -400,6 +406,7 @@ print(metrics.classification_report(y_train, preds_train))
 
 # Random baseline classifier
 dummy = DummyClassifier(strategy='most_frequent').fit(Xtrain_tf, train["binaryRatings"])
+dummy_preds = dummy.predict(Xtest_tf)
 fprDUMMY, tprDUMMY, _ = roc_curve(test["binaryRatings"],
                             dummy.predict_proba(Xtest_tf)[:, 1])
 # ROC curves
@@ -415,8 +422,52 @@ plt.title('ROC Plot')
 plt.legend(['Naive Bayes', 'Linear SVC', 'LSTM', 'Baseline CLF'])
 plt.show()
 
+# Confusion matrices
+conf_mtx_lstm = confusion_matrix(test_nn["binaryRatings"], preds_test)
+conf_mtx_linSVC = confusion_matrix(test["binaryRatings"], pred_svc)
+conf_mtx_NB = confusion_matrix(test["binaryRatings"], testRatingPrediction)
+conf_mtx_dummy = confusion_matrix(test["binaryRatings"], dummy_preds)
 
 
+def plot_conf_matrix(cm, classes,
+                        normalize=False,
+                        title='Confusion matrix',
+                        cmap=plt.cm.Blues):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
 
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
 
-# Random baseline
+    print(cm)
+
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, cm[i, j],
+            horizontalalignment="center",
+            color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+
+labels = ['positive', 'negative']
+
+plot_conf_matrix(cm=conf_mtx_lstm, classes=labels, title="LSTM")
+plot_conf_matrix(cm=conf_mtx_linSVC, classes=labels, title="Linear SVC")
+plot_conf_matrix(cm=conf_mtx_NB, classes=labels, title="Naive Bayes")
+plot_conf_matrix(cm=conf_mtx_dummy, classes=labels, title="Baseline CLF")
+
+plt.show()
+
