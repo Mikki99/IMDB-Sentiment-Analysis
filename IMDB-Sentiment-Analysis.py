@@ -239,6 +239,10 @@ print("\nsamples: %d, features: %d" % Xtrain_tf.shape)
 Xtest_tf = tf_idf.transform(test['Reviews'])
 print("samples: %d, features: %d" % Xtest_tf.shape)
 
+####################################################################
+####################################################################
+####################################################################
+
 # #MultinomialNB - https://scikit-learn.org/stable/modules/generated/sklearn.naive_bayes.MultinomialNB.html#sklearn.naive_bayes.MultinomialNB
 naiveBayesClassifier = MultinomialNB()
 naiveBayesClassifier.fit(Xtrain_tf, train['binaryRatings'])
@@ -246,17 +250,19 @@ naiveBayesClassifier.fit(Xtrain_tf, train['binaryRatings'])
 trainRatingPrediction = naiveBayesClassifier.predict(Xtrain_tf)
 testRatingPrediction = naiveBayesClassifier.predict(Xtest_tf)
 
-print("Training Confusion Matrix")
-print(metrics.classification_report(train['binaryRatings'], trainRatingPrediction))
-
-print("Testing Confusion Matrix")
+print("Testing Confusion Matrix -- Naive Bayes")
 print(metrics.classification_report(test['binaryRatings'], testRatingPrediction))
+
+####################################################################
+####################################################################
+####################################################################
 
 # TODO: Logistic Regression
 logisticRegression_variable = LogisticRegression()
 cross_score = cross_val_score(logisticRegression_variable, Xtrain_tf, train['binaryRatings'])
 logisticRegression_variable.fit(Xtrain_tf, train['binaryRatings'])
 test_prediction = logisticRegression_variable.predict(Xtest_tf)
+print("Testing Confusion Matrix -- Logistic Regression")
 print(metrics.classification_report(test['binaryRatings'], test_prediction))
 
 YscoreLR = logisticRegression_variable.predict_proba(Xtest_tf)
@@ -288,6 +294,7 @@ lin_svc = LinearSVC(C=0.1)
 lin_svc.fit(Xtrain_tf, train['binaryRatings'])
 pred_svc = lin_svc.predict(Xtest_tf)
 
+print("Testing Confusion Matrix -- Linear SVC")
 print(metrics.classification_report(test['binaryRatings'], pred_svc))
 
 #ROC
@@ -415,7 +422,9 @@ preds_test = np.array([1 if pred > 0.5 else 0 for pred in preds_test.flatten()])
 preds_train = model.predict(X_train_seq_padded)
 preds_train = np.array([1 if pred > 0.5 else 0 for pred in preds_train.flatten()])
 
+print("Testing Confusion Matrix -- LSTM")
 print(metrics.classification_report(y_test, preds_test))
+print("Training Confusion Matrix -- LSTM")
 print(metrics.classification_report(y_train, preds_train))
 
 result_list = []
