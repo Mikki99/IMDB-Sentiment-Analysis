@@ -28,7 +28,7 @@ from tensorflow.keras.models import Sequential
 from wordcloud import WordCloud
 from sklearn.metrics import roc_curve
 
-tsv_data = pd.read_csv('movie_reviews3.tsv', sep='\t')
+tsv_data = pd.read_csv('movie_reviews.tsv', sep='\t')
 tsv_data.columns = ['Ratings', 'Reviews']
 tsv_data['binaryRatings'] = np.where(tsv_data['Ratings'] <= 5, -1, 1)
 
