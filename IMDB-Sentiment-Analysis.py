@@ -86,7 +86,7 @@ wordcloud = WordCloud(stopwords=stopwords.words('english'),
                   colormap = 'Reds',
                   width=2500,
                   height=2000
-                 ).generate(negativeRatings['Reviews'].iloc[1])
+                 ).generate(negativeRatings['Reviews'].iloc[2])
 plt.figure(1,figsize=(10, 7))
 plt.imshow(wordcloud)
 plt.axis('off')
