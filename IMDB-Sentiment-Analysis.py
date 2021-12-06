@@ -26,7 +26,7 @@ from kerastuner.tuners import RandomSearch
 from kerastuner.engine.hyperparameters import HyperParameters
 from tensorflow.keras.models import Sequential
 from wordcloud import WordCloud
-from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_curve, roc_auc_score
 from sklearn.dummy import DummyClassifier
 from sklearn.metrics import confusion_matrix
 import itertools
@@ -458,6 +458,7 @@ conf_mtx_linSVC = confusion_matrix(test["binaryRatings"], pred_svc)
 conf_mtx_NB = confusion_matrix(test["binaryRatings"], testRatingPrediction)
 conf_mtx_dummy = confusion_matrix(test["binaryRatings"], dummy_preds)
 conf_mtx_lr = confusion_matrix(test["binaryRatings"], test_prediction)
+conf_mtx_tb = confusion_matrix(test["binaryRatings"], outcome_labels)
 
 
 def plot_conf_matrix(cm, classes,
@@ -500,6 +501,7 @@ plot_conf_matrix(cm=conf_mtx_linSVC, classes=labels, title="Linear SVC")
 plot_conf_matrix(cm=conf_mtx_NB, classes=labels, title="Naive Bayes")
 plot_conf_matrix(cm=conf_mtx_dummy, classes=labels, title="Baseline CLF")
 plot_conf_matrix(cm=conf_mtx_lr, classes=labels, title="Logistic Regression")
+plot_conf_matrix(cm=conf_mtx_dummy, classes=labels, title="TextBlob")
 
 plt.show()
 
