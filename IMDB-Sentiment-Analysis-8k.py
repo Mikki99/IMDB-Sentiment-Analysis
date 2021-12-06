@@ -225,11 +225,6 @@ print(metrics.classification_report(train['binaryRatings'], trainRatingPredictio
 print("Testing Confusion Matrix")
 print(metrics.classification_report(test['binaryRatings'], testRatingPrediction))
 
-naiveBayesCM = metrics.ConfusionMatrixDisplay(confusion_matrix = metrics.classification_report(test['binaryRatings'], testRatingPrediction),display_labels=naiveBayesClassifier.classes_)
-
-naiveBayesCM.plot()
-plt.show()
-
 # TODO: Logistic Regression
 
 
