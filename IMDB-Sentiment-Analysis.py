@@ -32,6 +32,7 @@ from sklearn.metrics import confusion_matrix
 import itertools
 from textblob import TextBlob
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score
 
 
 tsv_data = pd.read_csv('movie_reviews3.tsv', sep='\t')
@@ -258,7 +259,7 @@ test_prediction = logisticRegression_variable.predict(Xtest_tf)
 print(metrics.classification_report(test['binaryRatings'], test_prediction))
 
 YscoreLR = logisticRegression_variable.predict_proba(Xtest_tf)
-fprLR, tprLR, _ = roc_curve(test['binaryRatings'], YscoreMNB[:, 1])
+fprLR, tprLR, _ = roc_curve(test['binaryRatings'], YscoreLR[:, 1])
 
 # Linear SVC
 lin_svc = LinearSVC()
@@ -418,16 +419,17 @@ print(metrics.classification_report(y_train, preds_train))
 
 result_list = []
 outcome_labels = []
-for index, row in tsv_data.iterrows():
+for index, row in test.iterrows():
     result_textBlob = TextBlob(row["Reviews"]).sentiment
     polarity_value = result_textBlob.polarity
     if polarity_value > 0:
         outcome_labels.append(-1)
     else:
         outcome_labels.append(1)
+
 print(test['binaryRatings'])
-# print("Inbult Function",f1_score(test['binaryRatings'], outcome_labels))
-# print("Our Model",f1_score(tsv_data['binaryRatings'],test['binaryRatings']))
+print("TextBlob f1-score:", f1_score(test['binaryRatings'], outcome_labels))
+print("LogReg f1-score:", f1_score(test['binaryRatings'], test_prediction))
 
 # Random baseline classifier
 dummy = DummyClassifier(strategy='most_frequent').fit(Xtrain_tf, train["binaryRatings"])
@@ -436,16 +438,18 @@ fprDUMMY, tprDUMMY, _ = roc_curve(test["binaryRatings"],
                             dummy.predict_proba(Xtest_tf)[:, 1])
 # ROC curves
 fprLSTM, tprLSTM, _ = roc_curve(test['binaryRatings'], model.predict(X_test_seq_padded).ravel())
+fprTB, tprTB, _ = roc_curve(test['binaryRatings'], outcome_labels)
 
 plt.plot(fprMNB, tprMNB)
 plt.plot(fprLSVC, tprLSVC)
 plt.plot(fprLSTM, tprLSTM)
 plt.plot(fprDUMMY, tprDUMMY, linestyle='--')
 plt.plot(fprLR, tprLR)
+plt.plot(fprTB, tprTB, linestyle='--')
 plt.xlabel('false positive rate')
 plt.ylabel('true positive rate')
 plt.title('ROC Plot')
-plt.legend(['Naive Bayes', 'Linear SVC', 'LSTM', 'Baseline CLF', 'Logistic Regression'])
+plt.legend(['Naive Bayes', 'Linear SVC', 'LSTM', 'Baseline CLF', 'Logistic Regression', 'TextBlob'])
 plt.show()
 
 # Confusion matrices
