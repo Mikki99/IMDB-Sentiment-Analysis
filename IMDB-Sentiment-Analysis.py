@@ -313,46 +313,47 @@ print(X_train_seq_padded.shape)
 print(X_test_seq_padded.shape)
 
 
-def build_model(hp):
-    model = Sequential()
+def lstm_hp_tune(verbose=False):
+    def build_model(hp):
+        model = Sequential()
 
-    model.add(Embedding(vocab_size,
-                        hp.Int('emb_dim', min_value=32, max_value=256, step=32),
-                        input_shape=(max_len, )))
-    # for i in range(hp.Int('n_layers', 0, 3)):
-    #     model.add(Bidirectional(LSTM(hp.Int(f'BiLSTM_{i}_neurons', min_value=2, max_value=64, step=4),
-    #                                  return_sequences=True)))
-    model.add(Bidirectional(LSTM(units=hp.Int('BiLSTM_neurons', min_value=2, max_value=64, step=4))))
-    model.add(Dense(hp.Int('dense_neurons', min_value=32, max_value=256, step=32), activation='relu'))
-    model.add(Dropout(hp.Float('dropout_rate', min_value=0, max_value=0.5, step=0.1)))
-    model.add(Dense(1, activation='sigmoid'))
+        model.add(Embedding(vocab_size,
+                            hp.Int('emb_dim', min_value=32, max_value=256, step=32),
+                            input_shape=(max_len, )))
+        for i in range(hp.Int('n_layers', 0, 3)):
+            model.add(Bidirectional(LSTM(hp.Int(f'BiLSTM_{i}_neurons', min_value=2, max_value=64, step=4),
+                                         return_sequences=True)))
+        model.add(Bidirectional(LSTM(units=hp.Int('BiLSTM_neurons', min_value=2, max_value=64, step=4))))
+        model.add(Dense(hp.Int('dense_neurons', min_value=32, max_value=256, step=32), activation='relu'))
+        model.add(Dropout(hp.Float('dropout_rate', min_value=0, max_value=0.5, step=0.1)))
+        model.add(Dense(1, activation='sigmoid'))
 
-    #optimizer = Adam(learning_rate=0.0009)
+        model.compile(optimizer='adam',
+                      loss='binary_crossentropy',
+                      metrics=['accuracy'])
+        return model
 
-    model.compile(optimizer='adam',
-                  loss='binary_crossentropy',
-                  metrics=['accuracy'])
-    return model
+    tuner = RandomSearch(
+        build_model,
+        objective='val_accuracy',
+        max_trials=3,
+        executions_per_trial=1
+    )
 
-tuner1 = RandomSearch(
-    build_model,
-    objective='val_accuracy',
-    max_trials=3,
-    executions_per_trial=1
-)
+    tuner.search(x=X_train_seq_padded,
+                 y=y_train,
+                 epochs=5,
+                 batch_size=64,
+                 validation_data=(X_test_seq_padded, y_test))
 
-tuner1.search(x=X_train_seq_padded,
-             y=y_train,
-             epochs=5,
-             batch_size=64,
-             validation_data=(X_test_seq_padded, y_test))
+    best_model = tuner.get_best_models(num_models=1)[0]
+    best_hp = tuner.get_best_hyperparameters()[0].values
 
-best_model = tuner1.get_best_models(num_models=1)[0]
-best_hp = tuner1.get_best_hyperparameters()[0].values
+    if verbose:
+        print(best_model.summary())
+        print(tuner.results_summary())
 
-print(tuner1.results_summary())
-print(best_hp)
-best_model.summary()
+    return best_hp
 
 # Defining the model
 inputs = Input(shape=(max_len,))
